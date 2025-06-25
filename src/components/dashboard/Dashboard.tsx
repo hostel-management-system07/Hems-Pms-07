@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Product, Task } from '@/types';
@@ -25,31 +25,10 @@ export function Dashboard() {
   useEffect(() => {
     if (user) {
       fetchDashboardData();
-      
-      // Set up real-time listeners
-      const unsubscribeProducts = onSnapshot(collection(db, 'products'), () => {
-        fetchDashboardData();
-      });
-      
-      const unsubscribeTasks = onSnapshot(collection(db, 'tasks'), () => {
-        fetchDashboardData();
-      });
-      
-      const unsubscribeUsers = onSnapshot(collection(db, 'users'), () => {
-        fetchDashboardData();
-      });
-
-      return () => {
-        unsubscribeProducts();
-        unsubscribeTasks();
-        unsubscribeUsers();
-      };
     }
   }, [user]);
 
   const fetchDashboardData = async () => {
-    if (!user) return;
-    
     try {
       // Fetch products count
       const productsSnapshot = await getDocs(collection(db, 'products'));
@@ -64,73 +43,40 @@ export function Dashboard() {
       const recentProductsSnapshot = await getDocs(recentProductsQuery);
       const productsList = recentProductsSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date()
+        ...doc.data()
       } as Product));
 
-      // Fetch user's tasks or all tasks for admin
-      let userTasksQuery;
-      if (user.role === 'admin') {
-        userTasksQuery = query(
-          collection(db, 'tasks'),
-          orderBy('createdAt', 'desc'),
-          limit(5)
-        );
-      } else {
-        userTasksQuery = query(
-          collection(db, 'tasks'),
-          where('assignedTo', '==', user.id),
-          orderBy('createdAt', 'desc'),
-          limit(3)
-        );
-      }
-      
+      // Fetch user's tasks
+      const userTasksQuery = query(
+        collection(db, 'tasks'),
+        where('assignedTo', '==', user!.id),
+        orderBy('createdAt', 'desc'),
+        limit(3)
+      );
       const userTasksSnapshot = await getDocs(userTasksQuery);
       const tasksList = userTasksSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        dueDate: doc.data().dueDate?.toDate() || null
+        ...doc.data()
       } as Task));
 
-      // Fetch all tasks for stats
+      // Fetch all tasks for admin stats
       const allTasksSnapshot = await getDocs(collection(db, 'tasks'));
-      const allTasks = allTasksSnapshot.docs.map(doc => ({
-        ...doc.data(),
-        status: doc.data().status
-      }));
-      
-      let pendingTasks;
-      if (user.role === 'admin') {
-        pendingTasks = allTasks.filter(task => 
-          ['todo', 'in_progress'].includes(task.status)
-        ).length;
-      } else {
-        pendingTasks = tasksList.filter(task => 
-          ['todo', 'in_progress'].includes(task.status)
-        ).length;
-      }
+      const allTasks = allTasksSnapshot.docs.map(doc => doc.data() as Task);
+      const pendingTasks = allTasks.filter(task => 
+        ['todo', 'in_progress'].includes(task.status)
+      ).length;
 
-      // Fetch team members count and calculate active users
+      // Fetch team members count
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const teamMembers = usersSnapshot.size;
-      
-      const users = usersSnapshot.docs.map(doc => ({
-        ...doc.data(),
-        lastLogin: doc.data().lastLogin?.toDate() || new Date()
-      }));
-      
-      const activeUsers = users.filter(u => 
-        new Date().getTime() - u.lastLogin.getTime() < 7 * 24 * 60 * 60 * 1000
-      ).length;
 
       setStats({
         totalProducts,
         activeProjects: Math.floor(totalProducts * 0.7), // Estimate active projects
-        pendingTasks,
-        teamMembers: activeUsers, // Show active users instead of total
+        pendingTasks: user!.role === 'admin' ? pendingTasks : tasksList.filter(task => 
+          ['todo', 'in_progress'].includes(task.status)
+        ).length,
+        teamMembers,
       });
 
       setRecentProducts(productsList);
@@ -207,13 +153,13 @@ export function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+            <CardTitle className="text-sm font-medium">Team Members</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.teamMembers}</div>
             <p className="text-xs text-muted-foreground">
-              Last 7 days
+              Active team members
             </p>
           </CardContent>
         </Card>
@@ -289,7 +235,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Tasks */}
+        {/* Recent Tasks */}
         <Card>
           <CardHeader>
             <CardTitle>{isAdmin ? 'Recent Tasks' : 'My Tasks'}</CardTitle>

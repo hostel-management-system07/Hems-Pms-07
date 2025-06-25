@@ -1,10 +1,9 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User } from '@/types';
-import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -44,11 +43,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (userDoc.exists()) {
           const userData = userDoc.data() as User;
           setUser({ ...userData, id: firebaseUser.uid });
-          
-          // Update last login time
-          await updateDoc(doc(db, 'users', firebaseUser.uid), {
-            lastLogin: new Date()
-          });
         }
       } else {
         setFirebaseUser(null);
@@ -62,11 +56,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      // Update last login time
-      await updateDoc(doc(db, 'users', result.user.uid), {
-        lastLogin: new Date()
-      });
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       console.error('Sign in error:', error);
       throw error;
@@ -88,9 +78,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       };
 
       await setDoc(doc(db, 'users', user.uid), userData);
-      
-      // Sign out the user after signup so they can sign in
-      await signOut(auth);
     } catch (error) {
       console.error('Sign up error:', error);
       throw error;
@@ -115,11 +102,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
 
         await setDoc(doc(db, 'users', user.uid), userData);
-      } else {
-        // Update last login time
-        await updateDoc(doc(db, 'users', user.uid), {
-          lastLogin: new Date()
-        });
       }
     } catch (error) {
       console.error('Google sign in error:', error);

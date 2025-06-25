@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { User, Task } from '@/types';
@@ -31,26 +32,7 @@ export function AdminPanel() {
   }
 
   useEffect(() => {
-    // Set up real-time listeners
-    const unsubscribeUsers = onSnapshot(collection(db, 'users'), () => {
-      fetchAdminData();
-    });
-    
-    const unsubscribeTasks = onSnapshot(collection(db, 'tasks'), () => {
-      fetchAdminData();
-    });
-    
-    const unsubscribeProducts = onSnapshot(collection(db, 'products'), () => {
-      fetchAdminData();
-    });
-
     fetchAdminData();
-
-    return () => {
-      unsubscribeUsers();
-      unsubscribeTasks();
-      unsubscribeProducts();
-    };
   }, []);
 
   const fetchAdminData = async () => {
@@ -60,9 +42,7 @@ export function AdminPanel() {
       const usersSnapshot = await getDocs(usersQuery);
       const usersList = usersSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        lastLogin: doc.data().lastLogin?.toDate() || new Date()
+        ...doc.data()
       } as User & { id: string }));
 
       // Fetch tasks
@@ -70,19 +50,11 @@ export function AdminPanel() {
       const tasksSnapshot = await getDocs(tasksQuery);
       const tasksList = tasksSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        dueDate: doc.data().dueDate?.toDate() || null
+        ...doc.data()
       } as Task & { id: string }));
 
       // Fetch products count
       const productsSnapshot = await getDocs(collection(db, 'products'));
-
-      // Calculate active users (logged in within last 7 days)
-      const activeUsers = usersList.filter(u => 
-        new Date().getTime() - u.lastLogin.getTime() < 7 * 24 * 60 * 60 * 1000
-      ).length;
 
       setUsers(usersList);
       setTasks(tasksList);
@@ -90,7 +62,9 @@ export function AdminPanel() {
         totalUsers: usersList.length,
         totalProducts: productsSnapshot.size,
         totalTasks: tasksList.length,
-        activeUsers,
+        activeUsers: usersList.filter(u => 
+          new Date().getTime() - new Date(u.lastLogin).getTime() < 7 * 24 * 60 * 60 * 1000
+        ).length,
       });
     } catch (error) {
       console.error('Error fetching admin data:', error);
@@ -326,7 +300,7 @@ export function AdminPanel() {
                     <TableRow key={task.id}>
                       <TableCell>
                         <div className="font-medium">{task.title}</div>
-                        <div className="text-sm text-muted-foreground truncate max-w-xs">{task.description}</div>
+                        <div className="text-sm text-muted-foreground">{task.description}</div>
                       </TableCell>
                       <TableCell>
                         {assignedUser ? assignedUser.displayName : 'Unknown User'}
@@ -342,7 +316,7 @@ export function AdminPanel() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {task.dueDate ? task.dueDate.toLocaleDateString() : 'No due date'}
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -394,7 +368,7 @@ export function AdminPanel() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {userData.lastLogin.toLocaleDateString()}
+                      {new Date(userData.lastLogin).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
@@ -412,16 +386,14 @@ export function AdminPanel() {
                             <SelectItem value="stakeholder">Stakeholder</SelectItem>
                           </SelectContent>
                         </Select>
-                        {userData.id !== user.id && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => deleteUser(userData.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteUser(userData.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

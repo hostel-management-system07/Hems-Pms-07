@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { Toaster } from '@/components/ui/toaster';
@@ -35,22 +34,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth();
-
-  // Redirect authenticated users away from auth page
-  const shouldRedirectToDashboard = user && window.location.pathname === '/auth';
-
-  if (shouldRedirectToDashboard) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
       {user && <Navbar />}
       <main className={user ? 'pt-16' : ''}>
         <Routes>
-          <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Index />} />
-          <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<AuthPage />} />
           <Route
             path="/dashboard"
             element={
