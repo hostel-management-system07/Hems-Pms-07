@@ -1,9 +1,8 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { Toaster } from '@/components/ui/toaster';
 import { Navbar } from '@/components/layout/Navbar';
-import { Index } from '@/pages/Index';
+import Index from '@/pages/Index';
 import { AuthPage } from '@/pages/AuthPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ProductsPage } from '@/pages/ProductsPage';
@@ -14,7 +13,7 @@ import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { FeedbackPage } from '@/pages/FeedbackPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AdminPanel } from '@/pages/AdminPanel';
-import { NotFound } from '@/pages/NotFound';
+import NotFound from '@/pages/NotFound';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
