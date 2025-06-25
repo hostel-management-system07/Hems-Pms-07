@@ -35,15 +35,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth();
-
-  // Redirect authenticated users away from auth page
-  const shouldRedirectToDashboard = user && window.location.pathname === '/auth';
-
-  if (shouldRedirectToDashboard) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
+  const { user } = useAuth();
   return (
     <div className="min-h-screen bg-background">
       {user && <Navbar />}
