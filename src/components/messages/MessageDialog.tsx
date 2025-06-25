@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { collection, addDoc, query, where, orderBy, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, getDocs, updateDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Message, User } from '@/types';
@@ -26,48 +26,40 @@ export function MessageDialog({ receiverUser, children }: MessageDialogProps) {
 
   useEffect(() => {
     if (open && user) {
-      fetchMessages();
-    }
-  }, [open, user]);
-
-  const fetchMessages = async () => {
-    if (!user) return;
-
-    try {
-      // Fetch messages between current user and receiver
+      // Set up real-time listener for messages
       const messagesQuery = query(
         collection(db, 'messages'),
-        where('senderId', 'in', [user.id, receiverUser.id]),
-        where('receiverId', 'in', [user.id, receiverUser.id]),
         orderBy('timestamp', 'asc')
       );
 
-      const querySnapshot = await getDocs(messagesQuery);
-      const messagesList = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Message & { id: string }));
+      const unsubscribe = onSnapshot(messagesQuery, (querySnapshot) => {
+        const messagesList = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate() || new Date()
+        } as Message & { id: string }));
 
-      // Filter messages between these two users specifically
-      const filteredMessages = messagesList.filter(msg => 
-        (msg.senderId === user.id && msg.receiverId === receiverUser.id) ||
-        (msg.senderId === receiverUser.id && msg.receiverId === user.id)
-      );
+        // Filter messages between these two users specifically
+        const filteredMessages = messagesList.filter(msg => 
+          (msg.senderId === user.id && msg.receiverId === receiverUser.id) ||
+          (msg.senderId === receiverUser.id && msg.receiverId === user.id)
+        );
 
-      setMessages(filteredMessages);
+        setMessages(filteredMessages);
 
-      // Mark received messages as read
-      const unreadMessages = filteredMessages.filter(msg => 
-        msg.receiverId === user.id && !msg.read
-      );
+        // Mark received messages as read
+        const unreadMessages = filteredMessages.filter(msg => 
+          msg.receiverId === user.id && !msg.read
+        );
 
-      for (const msg of unreadMessages) {
-        await updateDoc(doc(db, 'messages', msg.id), { read: true });
-      }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
+        unreadMessages.forEach(async (msg) => {
+          await updateDoc(doc(db, 'messages', msg.id), { read: true });
+        });
+      });
+
+      return () => unsubscribe();
     }
-  };
+  }, [open, user, receiverUser.id]);
 
   const sendMessage = async () => {
     if (!user || !newMessage.trim()) return;
@@ -84,7 +76,6 @@ export function MessageDialog({ receiverUser, children }: MessageDialogProps) {
 
       await addDoc(collection(db, 'messages'), messageData);
       setNewMessage('');
-      fetchMessages(); // Refresh messages
 
       toast({
         title: "Message sent",
@@ -145,7 +136,7 @@ export function MessageDialog({ receiverUser, children }: MessageDialogProps) {
                     >
                       <p className="text-sm">{message.content}</p>
                       <p className="text-xs opacity-70 mt-1">
-                        {new Date(message.timestamp).toLocaleTimeString()}
+                        {message.timestamp.toLocaleTimeString()}
                       </p>
                     </div>
                   </div>
