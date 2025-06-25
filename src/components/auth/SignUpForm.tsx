@@ -31,8 +31,10 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
       await signUp(email, password, displayName, role);
       toast({
         title: "Account created!",
-        description: "Welcome to Smart PMS. You can now start managing products.",
+        description: "Please sign in with your new account.",
       });
+      // Redirect to sign-in page after successful signup
+      onToggleMode();
     } catch (error: any) {
       toast({
         title: "Sign up failed",
