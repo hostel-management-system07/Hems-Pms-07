@@ -49,8 +49,8 @@ function AppContent() {
       {user && <Navbar />}
       <main className={user ? 'pt-16' : ''}>
         <Routes>
-          <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Index />} />
-          <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+         <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<AuthPage />} />
           <Route
             path="/dashboard"
             element={
