@@ -1,6 +1,6 @@
 
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X, Upload } from 'lucide-react';
+import { Plus, X, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProductFormProps {
@@ -39,9 +39,53 @@ export function ProductForm({ productId }: ProductFormProps) {
   });
   const [tagInput, setTagInput] = useState('');
 
+  useEffect(() => {
+    if (productId) {
+      fetchProduct();
+    }
+  }, [productId]);
+
+  const fetchProduct = async () => {
+    if (!productId) return;
+    
+    try {
+      const productDoc = await getDoc(doc(db, 'products', productId));
+      if (productDoc.exists()) {
+        const productData = productDoc.data() as Product;
+        setFormData({
+          name: productData.name,
+          description: productData.description,
+          sku: productData.sku,
+          category: productData.category,
+          brand: productData.brand,
+          price: productData.price,
+          stock: productData.stock,
+          status: productData.status,
+          tags: productData.tags,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch product data.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    if (user.role !== 'admin') {
+      toast({
+        title: "Access Denied",
+        description: "Only admins can create or edit products.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -57,22 +101,21 @@ export function ProductForm({ productId }: ProductFormProps) {
         images: imageUrl ? [imageUrl] : [],
         specs: {},
         createdBy: user.id,
-        createdAt: new Date(),
         updatedAt: new Date(),
         version: 1,
       };
 
       if (productId) {
-        await updateDoc(doc(db, 'products', productId), {
-          ...productData,
-          updatedAt: new Date(),
-        });
+        await updateDoc(doc(db, 'products', productId), productData);
         toast({
           title: "Product updated",
           description: "The product has been successfully updated.",
         });
       } else {
-        await addDoc(collection(db, 'products'), productData);
+        await addDoc(collection(db, 'products'), {
+          ...productData,
+          createdAt: new Date(),
+        });
         toast({
           title: "Product created",
           description: "The product has been successfully created.",
@@ -111,6 +154,14 @@ export function ProductForm({ productId }: ProductFormProps) {
 
   return (
     <div className="container mx-auto px-4 py-6">
+      {/* Back Button */}
+      <Link to="/products">
+        <Button variant="outline" size="sm" className="mb-6">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Products
+        </Button>
+      </Link>
+
       <Card>
         <CardHeader>
           <CardTitle>{productId ? 'Edit Product' : 'Create New Product'}</CardTitle>

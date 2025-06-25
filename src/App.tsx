@@ -1,86 +1,137 @@
 
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/toaster';
-import { Toaster as Sonner } from '@/components/ui/sonner';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { Toaster } from '@/components/ui/toaster';
 import { Navbar } from '@/components/layout/Navbar';
+import { Index } from '@/pages/Index';
 import { AuthPage } from '@/pages/AuthPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ProductsPage } from '@/pages/ProductsPage';
 import { CreateProductPage } from '@/pages/CreateProductPage';
+import { CreateTaskPage } from '@/pages/CreateTaskPage';
 import { TeamsPage } from '@/pages/TeamsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { FeedbackPage } from '@/pages/FeedbackPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AdminPanel } from '@/pages/AdminPanel';
-import NotFound from './pages/NotFound';
+import { NotFound } from '@/pages/NotFound';
 
-const queryClient = new QueryClient();
-
-function AppRoutes() {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   if (!user) {
-    return <AuthPage />;
+    return <Navigate to="/auth" replace />;
   }
 
+  return <>{children}</>;
+}
+
+function AppContent() {
+  const { user } = useAuth();
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navbar />
-      <main>
+    <div className="min-h-screen bg-background">
+      {user && <Navbar />}
+      <main className={user ? 'pt-16' : ''}>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/products/new" element={<CreateProductPage />} />
-          <Route path="/teams" element={<TeamsPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/feedback" element={<FeedbackPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          {user.role === 'admin' && (
-            <Route path="/admin" element={<AdminPanel />} />
-          )}
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <ProtectedRoute>
+                <ProductsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/products/new"
+            element={
+              <ProtectedRoute>
+                <CreateProductPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tasks/new"
+            element={
+              <ProtectedRoute>
+                <CreateTaskPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teams"
+            element={
+              <ProtectedRoute>
+                <TeamsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <AnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/feedback"
+            element={
+              <ProtectedRoute>
+                <FeedbackPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
+      <Toaster />
     </div>
   );
 }
 
-const App = () => {
-  useEffect(() => {
-    // Initialize dark mode based on system preference
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
-
+function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <div className="w-full">
-              <AppRoutes />
-            </div>
-            <Toaster />
-            <Sonner />
-          </BrowserRouter>
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
-};
+}
 
 export default App;

@@ -60,3 +60,12 @@ export interface Milestone {
   status: 'planned' | 'in_progress' | 'completed' | 'delayed';
   tasks: string[];
 }
+
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  timestamp: Date;
+  read: boolean;
+}

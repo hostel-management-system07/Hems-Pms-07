@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/hooks/useAuth';
 import { Product } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,16 +17,20 @@ import {
   Eye,
   Package,
   DollarSign,
-  Archive
+  Archive,
+  ArrowLeft
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function ProductList() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     fetchProducts();
@@ -62,6 +67,15 @@ export function ProductList() {
   };
 
   const handleDelete = async (productId: string) => {
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Only admins can delete products.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await deleteDoc(doc(db, 'products', productId));
@@ -108,6 +122,14 @@ export function ProductList() {
 
   return (
     <div className="space-y-6">
+      {/* Back Button */}
+      <Link to="/dashboard">
+        <Button variant="outline" size="sm">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+      </Link>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -116,12 +138,14 @@ export function ProductList() {
             Manage your product catalog and lifecycle
           </p>
         </div>
-        <Link to="/products/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link to="/products/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Search */}
@@ -144,10 +168,10 @@ export function ProductList() {
             <p className="text-muted-foreground text-center mb-4">
               {searchTerm 
                 ? "No products match your search criteria."
-                : "Get started by creating your first product."
+                : "No products available."
               }
             </p>
-            {!searchTerm && (
+            {!searchTerm && isAdmin && (
               <Link to="/products/new">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
@@ -211,21 +235,23 @@ export function ProductList() {
                         View
                       </Button>
                     </Link>
-                    <div className="flex space-x-2">
-                      <Link to={`/products/${product.id}/edit`}>
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
+                    {isAdmin && (
+                      <div className="flex space-x-2">
+                        <Link to={`/products/${product.id}/edit`}>
+                          <Button variant="outline" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(product.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      </Link>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(product.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

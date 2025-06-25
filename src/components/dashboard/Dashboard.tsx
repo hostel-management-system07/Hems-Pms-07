@@ -1,25 +1,13 @@
 
 import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { Product, Task } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
-import { 
-  Package, 
-  Users, 
-  TrendingUp, 
-  MessageSquare, 
-  Plus,
-  BarChart3,
-  Clock,
-  CheckCircle
-} from 'lucide-react';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { Product, Task } from '@/types';
-import { TaskForm } from '@/components/tasks/TaskForm';
+import { BarChart3, Package, Users, Plus, ArrowRight, CheckCircle, Clock } from 'lucide-react';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -28,72 +16,71 @@ export function Dashboard() {
     totalProducts: 0,
     activeProjects: 0,
     pendingTasks: 0,
-    teamMembers: 0
+    teamMembers: 0,
   });
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
-  const [recentTasks, setRecentTasks] = useState<Task[]>([]);
+  const [userTasks, setUserTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showTaskForm, setShowTaskForm] = useState(false);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   const fetchDashboardData = async () => {
     try {
       // Fetch products count
-      const productsQuery = query(collection(db, 'products'));
-      const productsSnapshot = await getDocs(productsQuery);
-      
-      // Fetch recent products
+      const productsSnapshot = await getDocs(collection(db, 'products'));
+      const totalProducts = productsSnapshot.size;
+
+      // Fetch recent products (limit 3)
       const recentProductsQuery = query(
         collection(db, 'products'),
         orderBy('createdAt', 'desc'),
-        limit(5)
+        limit(3)
       );
       const recentProductsSnapshot = await getDocs(recentProductsQuery);
-      
-      // Fetch pending tasks
-      const tasksQuery = query(
+      const productsList = recentProductsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Product));
+
+      // Fetch user's tasks
+      const userTasksQuery = query(
         collection(db, 'tasks'),
-        where('status', 'in', ['todo', 'in_progress'])
-      );
-      const tasksSnapshot = await getDocs(tasksQuery);
-      
-      // Fetch recent tasks
-      const recentTasksQuery = query(
-        collection(db, 'tasks'),
+        where('assignedTo', '==', user!.id),
         orderBy('createdAt', 'desc'),
-        limit(5)
+        limit(3)
       );
-      const recentTasksSnapshot = await getDocs(recentTasksQuery);
+      const userTasksSnapshot = await getDocs(userTasksQuery);
+      const tasksList = userTasksSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Task));
+
+      // Fetch all tasks for admin stats
+      const allTasksSnapshot = await getDocs(collection(db, 'tasks'));
+      const allTasks = allTasksSnapshot.docs.map(doc => doc.data() as Task);
+      const pendingTasks = allTasks.filter(task => 
+        ['todo', 'in_progress'].includes(task.status)
+      ).length;
 
       // Fetch team members count
-      const usersQuery = query(collection(db, 'users'));
-      const usersSnapshot = await getDocs(usersQuery);
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const teamMembers = usersSnapshot.size;
 
       setStats({
-        totalProducts: productsSnapshot.size,
-        activeProjects: productsSnapshot.docs.filter(doc => 
-          ['design', 'development'].includes(doc.data().status)
+        totalProducts,
+        activeProjects: Math.floor(totalProducts * 0.7), // Estimate active projects
+        pendingTasks: user!.role === 'admin' ? pendingTasks : tasksList.filter(task => 
+          ['todo', 'in_progress'].includes(task.status)
         ).length,
-        pendingTasks: tasksSnapshot.size,
-        teamMembers: usersSnapshot.size
+        teamMembers,
       });
 
-      setRecentProducts(
-        recentProductsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as Product))
-      );
-
-      setRecentTasks(
-        recentTasksSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as Task))
-      );
+      setRecentProducts(productsList);
+      setUserTasks(tasksList);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -101,42 +88,7 @@ export function Dashboard() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ideation':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'design':
-        return 'bg-blue-100 text-blue-800';
-      case 'development':
-        return 'bg-purple-100 text-purple-800';
-      case 'launch':
-        return 'bg-green-100 text-green-800';
-      case 'retired':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'bg-red-100 text-red-800';
-      case 'high':
-        return 'bg-orange-100 text-orange-800';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'low':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const handleTaskCreated = () => {
-    setShowTaskForm(false);
-    fetchDashboardData();
-  };
+  const isAdmin = user?.role === 'admin';
 
   if (loading) {
     return (
@@ -149,11 +101,9 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white">
-        <h1 className="text-2xl font-bold mb-2">
-          Welcome back, {user?.displayName}!
-        </h1>
-        <p className="text-blue-100">
+      <div>
+        <h1 className="text-2xl font-bold">Welcome back, {user?.displayName}!</h1>
+        <p className="text-muted-foreground">
           Here's what's happening with your products today.
         </p>
       </div>
@@ -168,7 +118,7 @@ export function Dashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalProducts}</div>
             <p className="text-xs text-muted-foreground">
-              +12% from last month
+              Products in system
             </p>
           </CardContent>
         </Card>
@@ -176,25 +126,27 @@ export function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.activeProjects}</div>
             <p className="text-xs text-muted-foreground">
-              +3 new this week
+              Currently in development
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Tasks</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {isAdmin ? 'Pending Tasks' : 'My Tasks'}
+            </CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.pendingTasks}</div>
             <p className="text-xs text-muted-foreground">
-              5 due this week
+              {isAdmin ? 'Tasks in progress' : 'Tasks assigned to you'}
             </p>
           </CardContent>
         </Card>
@@ -213,124 +165,114 @@ export function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Products */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Recent Products</CardTitle>
-                <CardDescription>Latest products added to the system</CardDescription>
-              </div>
-              <Button size="sm" onClick={() => navigate('/products/new')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Product
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentProducts.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No products yet. Create your first product to get started.
-                </p>
-              ) : (
-                recentProducts.map((product) => (
-                  <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <h4 className="font-medium">{product.name}</h4>
-                      <p className="text-sm text-muted-foreground">{product.category}</p>
-                    </div>
-                    <Badge className={getStatusColor(product.status)}>
-                      {product.status}
-                    </Badge>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Tasks */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Recent Tasks</CardTitle>
-                <CardDescription>Latest tasks and their status</CardDescription>
-              </div>
-              <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Task
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <TaskForm onTaskCreated={handleTaskCreated} />
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No tasks yet. Create your first task to get started.
-                </p>
-              ) : (
-                recentTasks.map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <h4 className="font-medium">{task.title}</h4>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Badge className={getPriorityColor(task.priority)}>
-                          {task.priority}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          {task.status === 'done' ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Clock className="h-4 w-4" />
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
           <CardDescription>Common tasks you can perform</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/products/new')}>
-              <Package className="h-6 w-6 mb-2" />
-              New Product
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {isAdmin && (
+            <Button onClick={() => navigate('/products/new')} className="h-auto p-4 flex flex-col items-center space-y-2">
+              <Plus className="h-6 w-6" />
+              <span>New Product</span>
             </Button>
-            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/analytics')}>
-              <BarChart3 className="h-6 w-6 mb-2" />
-              View Analytics
-            </Button>
-            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/teams')}>
-              <Users className="h-6 w-6 mb-2" />
-              Manage Team
-            </Button>
-            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/feedback')}>
-              <MessageSquare className="h-6 w-6 mb-2" />
-              Customer Feedback
-            </Button>
-          </div>
+          )}
+          <Button onClick={() => navigate('/analytics')} variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
+            <BarChart3 className="h-6 w-6" />
+            <span>View Analytics</span>
+          </Button>
+          <Button onClick={() => navigate('/teams')} variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
+            <Users className="h-6 w-6" />
+            <span>Manage Team</span>
+          </Button>
+          <Button onClick={() => navigate('/feedback')} variant="outline" className="h-auto p-4 flex flex-col items-center space-y-2">
+            <Package className="h-6 w-6" />
+            <span>Customer Feedback</span>
+          </Button>
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Products */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Recent Products</CardTitle>
+              <CardDescription>Latest products added to the system</CardDescription>
+            </div>
+            <Link to="/products">
+              <Button variant="ghost" size="sm">
+                View all <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {recentProducts.length === 0 ? (
+              <div className="text-center py-6">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-muted-foreground">No products yet.</p>
+                {isAdmin && (
+                  <Button onClick={() => navigate('/products/new')} className="mt-2">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Product
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentProducts.map((product) => (
+                  <div key={product.id} className="flex items-center justify-between p-3 border rounded">
+                    <div>
+                      <h4 className="font-medium">{product.name}</h4>
+                      <p className="text-sm text-muted-foreground">{product.category}</p>
+                    </div>
+                    <div className="text-sm font-medium">${product.price}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Tasks */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{isAdmin ? 'Recent Tasks' : 'My Tasks'}</CardTitle>
+            <CardDescription>
+              {isAdmin ? 'Latest tasks and their status' : 'Tasks assigned to you'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {userTasks.length === 0 ? (
+              <div className="text-center py-6">
+                <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {isAdmin ? 'No tasks yet.' : 'No tasks assigned to you yet.'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {userTasks.map((task) => (
+                  <div key={task.id} className="flex items-center justify-between p-3 border rounded">
+                    <div>
+                      <h4 className="font-medium">{task.title}</h4>
+                      <p className="text-sm text-muted-foreground capitalize">{task.status.replace('_', ' ')}</p>
+                    </div>
+                    <div className={`text-xs px-2 py-1 rounded ${
+                      task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {task.priority}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -3,20 +3,21 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
-import { User } from '@/types';
+import { User, Task } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, Users, Trash2, Edit, BarChart3, Package } from 'lucide-react';
+import { Shield, Users, Trash2, BarChart3, Package, Plus, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 
 export function AdminPanel() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<(User & { id: string })[]>([]);
+  const [tasks, setTasks] = useState<(Task & { id: string })[]>([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalProducts: 0,
@@ -44,17 +45,23 @@ export function AdminPanel() {
         ...doc.data()
       } as User & { id: string }));
 
+      // Fetch tasks
+      const tasksQuery = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+      const tasksSnapshot = await getDocs(tasksQuery);
+      const tasksList = tasksSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Task & { id: string }));
+
       // Fetch products count
       const productsSnapshot = await getDocs(collection(db, 'products'));
-      
-      // Fetch tasks count
-      const tasksSnapshot = await getDocs(collection(db, 'tasks'));
 
       setUsers(usersList);
+      setTasks(tasksList);
       setStats({
         totalUsers: usersList.length,
         totalProducts: productsSnapshot.size,
-        totalTasks: tasksSnapshot.size,
+        totalTasks: tasksList.length,
         activeUsers: usersList.filter(u => 
           new Date().getTime() - new Date(u.lastLogin).getTime() < 7 * 24 * 60 * 60 * 1000
         ).length,
@@ -109,6 +116,26 @@ export function AdminPanel() {
     }
   };
 
+  const deleteTask = async (taskId: string) => {
+    if (window.confirm('Are you sure you want to delete this task?')) {
+      try {
+        await deleteDoc(doc(db, 'tasks', taskId));
+        setTasks(tasks.filter(t => t.id !== taskId));
+        toast({
+          title: "Task deleted",
+          description: "The task has been successfully deleted.",
+        });
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete task.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin':
@@ -119,6 +146,36 @@ export function AdminPanel() {
         return 'bg-green-100 text-green-800';
       case 'stakeholder':
         return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'todo':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'review':
+        return 'bg-purple-100 text-purple-800';
+      case 'done':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent':
+        return 'bg-red-100 text-red-800';
+      case 'high':
+        return 'bg-orange-100 text-orange-800';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'low':
+        return 'bg-green-100 text-green-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -135,6 +192,14 @@ export function AdminPanel() {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="space-y-6">
+        {/* Back Button */}
+        <Link to="/dashboard">
+          <Button variant="outline" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </Link>
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center">
@@ -145,6 +210,12 @@ export function AdminPanel() {
               Manage users, monitor system statistics, and configure settings
             </p>
           </div>
+          <Link to="/tasks/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Task
+            </Button>
+          </Link>
         </div>
 
         {/* Stats Cards */}
@@ -201,6 +272,69 @@ export function AdminPanel() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Task Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Task Management</CardTitle>
+            <CardDescription>
+              View and manage all tasks in the system
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Task</TableHead>
+                  <TableHead>Assigned To</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tasks.map((task) => {
+                  const assignedUser = users.find(u => u.id === task.assignedTo);
+                  return (
+                    <TableRow key={task.id}>
+                      <TableCell>
+                        <div className="font-medium">{task.title}</div>
+                        <div className="text-sm text-muted-foreground">{task.description}</div>
+                      </TableCell>
+                      <TableCell>
+                        {assignedUser ? assignedUser.displayName : 'Unknown User'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(task.status)}>
+                          {task.status.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getPriorityColor(task.priority)}>
+                          {task.priority}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteTask(task.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
         {/* User Management */}
         <Card>

@@ -8,7 +8,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Users, Search, Plus, Mail, Calendar, UserCheck } from 'lucide-react';
+import { MessageDialog } from '@/components/messages/MessageDialog';
+import { Users, Search, Plus, Mail, Calendar, UserCheck, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function TeamsPage() {
   const [teamMembers, setTeamMembers] = useState<(User & { id: string })[]>([]);
@@ -76,6 +78,14 @@ export function TeamsPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="space-y-6">
+        {/* Back Button */}
+        <Link to="/dashboard">
+          <Button variant="outline" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </Link>
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold">Team Management</h1>
@@ -200,9 +210,11 @@ export function TeamsPage() {
                     Last active {new Date(member.lastLogin).toLocaleDateString()}
                   </div>
                   <div className="flex space-x-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      Message
-                    </Button>
+                    <MessageDialog receiverUser={member}>
+                      <Button variant="outline" size="sm" className="flex-1">
+                        Message
+                      </Button>
+                    </MessageDialog>
                     <Button variant="outline" size="sm" className="flex-1">
                       View Profile
                     </Button>
