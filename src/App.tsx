@@ -10,9 +10,12 @@ import { Navbar } from '@/components/layout/Navbar';
 import { AuthPage } from '@/pages/AuthPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ProductsPage } from '@/pages/ProductsPage';
+import { CreateProductPage } from '@/pages/CreateProductPage';
 import { TeamsPage } from '@/pages/TeamsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { FeedbackPage } from '@/pages/FeedbackPage';
+import { SettingsPage } from '@/pages/SettingsPage';
+import { AdminPanel } from '@/pages/AdminPanel';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -40,9 +43,14 @@ function AppRoutes() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/products" element={<ProductsPage />} />
+          <Route path="/products/new" element={<CreateProductPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          {user.role === 'admin' && (
+            <Route path="/admin" element={<AdminPanel />} />
+          )}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

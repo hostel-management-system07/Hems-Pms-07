@@ -1,9 +1,11 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Package, 
   Users, 
@@ -17,18 +19,21 @@ import {
 import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product, Task } from '@/types';
+import { TaskForm } from '@/components/tasks/TaskForm';
 
 export function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalProducts: 0,
     activeProjects: 0,
     pendingTasks: 0,
-    teamMembers: 4
+    teamMembers: 0
   });
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showTaskForm, setShowTaskForm] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -63,13 +68,17 @@ export function Dashboard() {
       );
       const recentTasksSnapshot = await getDocs(recentTasksQuery);
 
+      // Fetch team members count
+      const usersQuery = query(collection(db, 'users'));
+      const usersSnapshot = await getDocs(usersQuery);
+
       setStats({
         totalProducts: productsSnapshot.size,
         activeProjects: productsSnapshot.docs.filter(doc => 
           ['design', 'development'].includes(doc.data().status)
         ).length,
         pendingTasks: tasksSnapshot.size,
-        teamMembers: 4
+        teamMembers: usersSnapshot.size
       });
 
       setRecentProducts(
@@ -122,6 +131,11 @@ export function Dashboard() {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const handleTaskCreated = () => {
+    setShowTaskForm(false);
+    fetchDashboardData();
   };
 
   if (loading) {
@@ -193,7 +207,7 @@ export function Dashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.teamMembers}</div>
             <p className="text-xs text-muted-foreground">
-              +1 new member
+              Active team members
             </p>
           </CardContent>
         </Card>
@@ -208,7 +222,7 @@ export function Dashboard() {
                 <CardTitle>Recent Products</CardTitle>
                 <CardDescription>Latest products added to the system</CardDescription>
               </div>
-              <Button size="sm">
+              <Button size="sm" onClick={() => navigate('/products/new')}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Product
               </Button>
@@ -245,10 +259,17 @@ export function Dashboard() {
                 <CardTitle>Recent Tasks</CardTitle>
                 <CardDescription>Latest tasks and their status</CardDescription>
               </div>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Task
-              </Button>
+              <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <TaskForm onTaskCreated={handleTaskCreated} />
+                </DialogContent>
+              </Dialog>
             </div>
           </CardHeader>
           <CardContent>
@@ -291,19 +312,19 @@ export function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button variant="outline" className="h-20 flex-col">
+            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/products/new')}>
               <Package className="h-6 w-6 mb-2" />
               New Product
             </Button>
-            <Button variant="outline" className="h-20 flex-col">
+            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/analytics')}>
               <BarChart3 className="h-6 w-6 mb-2" />
               View Analytics
             </Button>
-            <Button variant="outline" className="h-20 flex-col">
+            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/teams')}>
               <Users className="h-6 w-6 mb-2" />
               Manage Team
             </Button>
-            <Button variant="outline" className="h-20 flex-col">
+            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate('/feedback')}>
               <MessageSquare className="h-6 w-6 mb-2" />
               Customer Feedback
             </Button>

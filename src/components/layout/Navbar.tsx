@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -21,12 +21,14 @@ import {
   Settings,
   LogOut,
   Sun,
-  Moon
+  Moon,
+  Shield
 } from 'lucide-react';
 
 export function Navbar() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -38,6 +40,11 @@ export function Navbar() {
     { name: 'Feedback', href: '/feedback', icon: MessageSquare },
   ];
 
+  // Add admin panel for admin users
+  if (user?.role === 'admin') {
+    navigation.push({ name: 'Admin Panel', href: '/admin', icon: Shield });
+  }
+
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
     document.documentElement.classList.toggle('dark');
@@ -46,9 +53,14 @@ export function Navbar() {
   const handleLogout = async () => {
     try {
       await logout();
+      navigate('/');
     } catch (error) {
       console.error('Logout error:', error);
     }
+  };
+
+  const handleSettingsClick = () => {
+    navigate('/settings');
   };
 
   return (
@@ -119,7 +131,7 @@ export function Navbar() {
                     <p className="text-xs text-blue-600 capitalize">{user?.role?.replace('_', ' ')}</p>
                   </div>
                 </div>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSettingsClick}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
