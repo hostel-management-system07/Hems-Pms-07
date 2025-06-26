@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { Toaster } from '@/components/ui/toaster';
@@ -35,14 +34,29 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppContent() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {user && <Navbar />}
       <main className={user ? 'pt-16' : ''}>
         <Routes>
-         <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<AuthPage />} />
+          <Route 
+            path="/" 
+            element={user ? <Navigate to="/dashboard" replace /> : <Index />} 
+          />
+          <Route 
+            path="/auth" 
+            element={user ? <Navigate to="/dashboard" replace /> : <AuthPage />} 
+          />
           <Route
             path="/dashboard"
             element={
