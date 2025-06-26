@@ -93,10 +93,6 @@ export function TeamsPage() {
               Manage your team members and collaboration
             </p>
           </div>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Invite Team Member
-          </Button>
         </div>
 
         {/* Team Stats */}
