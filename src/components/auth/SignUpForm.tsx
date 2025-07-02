@@ -4,10 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Package, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { User } from '@/types';
 
 interface SignUpFormProps {
   onToggleMode: () => void;
@@ -17,7 +15,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [role, setRole] = useState<User['role']>('team_member');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
@@ -28,7 +25,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
     setLoading(true);
 
     try {
-      await signUp(email, password, displayName, role);
+      await signUp(email, password, displayName);
       toast({
         title: "Account created!",
         description: "Please sign in with your new account.",
@@ -113,20 +110,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
                   )}
                 </Button>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={(value: User['role']) => setRole(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select your role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="product_manager">Product Manager</SelectItem>
-                  <SelectItem value="team_member">Team Member</SelectItem>
-                  <SelectItem value="stakeholder">Stakeholder</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creating account...' : 'Create account'}
